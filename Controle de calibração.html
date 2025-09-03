@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle Avançado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+        @import url('https://rsms.me/inter/inter.css');
+        .card { background-color: white; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); padding: 1.5rem; transition: all 0.3s ease; }
+        .table-container { max-height: 600px; overflow-y: auto; }
+        thead th { position: sticky; top: 0; background-color: #f8fafc; z-index: 10; }
+        .modal-backdrop { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 50; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; }
+        .modal-backdrop.is-visible { opacity: 1; visibility: visible; }
+        .modal-content { background: white; padding: 2rem; border-radius: 0.5rem; width: 90%; max-width: 600px; transform: translateY(-20px); transition: transform 0.3s; }
+        .modal-backdrop.is-visible .modal-content { transform: translateY(0); }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #2563eb; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 2rem auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tab-button { display: flex; align-items: center; gap: 0.5rem; }
+        .tab-button.active { border-color: #2563eb; color: #2563eb; background-color: #dbeafe; }
+        .kpi-card { background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); color: white; border-radius: 0.75rem; padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; }
+        @media print { body, .card { margin: 0; box-shadow: none; } .no-print { display: none; } }
+    </style>
+</head>
+<body class="p-4 sm:p-6 lg:p-8">
+    <div class="max-w-7xl mx-auto">
+        <!-- CABEÇALHO E NAVEGAÇÃO -->
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">RCQ Controle de Qualidade</h1>
+            <p class="text-gray-600 mt-1">Controle de Calibração em Embarcações</p>
+            <div class="border-b border-gray-200 mt-4">
+                <nav class="-mb-px flex space-x-6 overflow-x-auto" id="tabs">
+                    <button onclick="changeTab('dashboard')" class="tab-button active shrink-0 py-3 px-1 border-b-2 font-medium text-sm"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 9V5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2v4"/><path d="M2 14h20"/><path d="M4 14v4c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-4"/></svg><span>Painel Principal</span></button>
+                    <button onclick="changeTab('opportunities')" class="tab-button shrink-0 py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg><span>Análise de Oportunidades</span></button>
+                    <button onclick="changeTab('management')" class="tab-button shrink-0 py-3 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-4.44a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8.38"/><path d="M16 2a2 2 0 0 1 2 2v2"/><path d="M18 4h-2"/><path d="M14 10.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 .5-.5z"/><path d="M14 13.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 .5-.5z"/><path d="M14 16.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0 0 1h3a.5.5 0 0 0 .5-.5z"/></svg><span>Gerenciamento</span></button>
+                </nav>
+            </div>
+        </header>
+
+        <!-- CONTEÚDO DAS ABAS -->
+        <main>
+            <!-- ABA 1: PAINEL PRINCIPAL -->
+            <div id="dashboard" class="tab-content">
+                <div class="flex justify-end mb-6 no-print">
+                     <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">
+                        + Adicionar Registro
+                    </button>
+                </div>
+                <!-- KPIs -->
+                <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="kpi-card"><div class="text-sm font-medium opacity-80">Certificados Vencidos</div><div id="kpi-vencidos" class="text-4xl font-bold mt-2">0</div></div>
+                    <div class="kpi-card"><div class="text-sm font-medium opacity-80">A Vencer (90 dias)</div><div id="kpi-a-vencer" class="text-4xl font-bold mt-2">0</div></div>
+                    <div class="kpi-card"><div class="text-sm font-medium opacity-80">Embarcações Ativas</div><div id="kpi-embarcacoes" class="text-4xl font-bold mt-2">0</div></div>
+                    <div class="kpi-card"><div class="text-sm font-medium opacity-80">Empresas Clientes</div><div id="kpi-empresas" class="text-4xl font-bold mt-2">0</div></div>
+                </section>
+                <!-- Gráficos -->
+                <section class="card mb-8">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">Embarcações Atendidas por Empresa</h2>
+                    <div class="relative h-72"><canvas id="companyVesselsChart"></canvas></div>
+                </section>
+                <!-- Tabela de Registros -->
+                <section class="card">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">Registros de Calibração</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4 no-print">
+                        <input type="text" id="filterEmbarcacao" onkeyup="refreshUI()" placeholder="Filtrar por embarcação..." class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select id="filterSituacao" onchange="refreshUI()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">Todas as Situações</option><option value="A vencer">A vencer</option><option value="Vencido">Vencido</option></select>
+                        <select id="filterStatus" onchange="refreshUI()" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">Todos os Status</option><option value="Finalizado">Finalizado</option><option value="Pendente">Pendente</option></select>
+                    </div>
+                    <div class="table-container border rounded-lg"><table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-6 py-3">Embarcação</th><th scope="col" class="px-6 py-3">Analista</th><th scope="col" class="px-6 py-3">Serviços (Qtd)</th><th scope="col" class="px-6 py-3">Data Realizado</th><th scope="col" class="px-6 py-3">Data de Validade</th><th scope="col" class="px-6 py-3">Situação</th><th scope="col" class="px-6 py-3">Status</th><th scope="col" class="px-6 py-3 no-print">Ações</th></tr></thead><tbody id="dataTableBody"><tr><td colspan="8"><div class="loader"></div></td></tr></tbody></table></div>
+                </section>
+            </div>
+
+            <!-- ABA 2: ANÁLISE DE OPORTUNIDADES -->
+            <div id="opportunities" class="tab-content hidden">
+                 <div class="card">
+                    <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                        <h2 class="text-xl font-semibold text-gray-700">Análise de Oportunidades</h2>
+                        <button onclick="generatePDF()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 no-print">Gerar PDF</button>
+                    </div>
+                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg no-print">
+                        <div class="md:col-span-2">
+                            <label for="opp-vessel-filter" class="block text-sm font-medium text-gray-700">Filtrar por Embarcação</label>
+                            <select id="opp-vessel-filter" onchange="generateOpportunityReport()" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></select>
+                        </div>
+                        <div>
+                            <label for="opp-year1" class="block text-sm font-medium text-gray-700">Ano de Referência</label>
+                            <select id="opp-year1" onchange="generateOpportunityReport()" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></select>
+                        </div>
+                        <div>
+                            <label for="opp-year2" class="block text-sm font-medium text-gray-700">Ano Atual</label>
+                            <select id="opp-year2" onchange="generateOpportunityReport()" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></select>
+                        </div>
+                    </div>
+                    <div id="pdf-content">
+                        <div id="pdf-header" class="hidden print:block mb-4 border-b pb-2">
+                            <h1 class="text-2xl font-bold">Relatório de Oportunidades</h1>
+                            <p class="text-sm text-gray-600" id="pdf-date"></p>
+                        </div>
+                        <div id="opportunity-report" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6"></div>
+                    </div>
+                 </div>
+            </div>
+
+            <!-- ABA 3: GERENCIAMENTO -->
+            <div id="management" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Coluna de Embarcações -->
+                     <div class="card">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-gray-700">Embarcações</h2>
+                            <button onclick="openManageModal('vessel')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">+</button>
+                        </div>
+                        <div class="table-container border rounded-lg"><table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-6 py-3">Nome</th><th scope="col" class="px-6 py-3">Empresa</th><th scope="col" class="px-6 py-3">Coordenador</th><th scope="col" class="px-6 py-3">Analista</th><th scope="col" class="px-6 py-3 text-right">Ações</th></tr></thead><tbody id="vesselsTableBody"></tbody></table></div>
+                    </div>
+                    <!-- Coluna de Cadastros Gerais -->
+                    <div class="space-y-8">
+                         <div class="card">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold text-gray-700">Empresas</h2>
+                                <button onclick="openManageModal('company')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">+</button>
+                            </div>
+                            <div class="table-container border rounded-lg"><table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-6 py-3">Nome</th><th scope="col" class="px-6 py-3 text-right">Ações</th></tr></thead><tbody id="companiesTableBody"></tbody></table></div>
+                        </div>
+                        <div class="card">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold text-gray-700">Coordenadores</h2>
+                                <button onclick="openManageModal('coordinator')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">+</button>
+                            </div>
+                            <div class="table-container border rounded-lg"><table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-6 py-3">Nome</th><th scope="col" class="px-6 py-3">Contato</th><th scope="col" class="px-6 py-3 text-right">Ações</th></tr></thead><tbody id="coordinatorsTableBody"></tbody></table></div>
+                        </div>
+                         <div class="card">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold text-gray-700">Analistas</h2>
+                                <button onclick="openManageModal('analyst')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">+</button>
+                            </div>
+                            <div class="table-container border rounded-lg"><table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-6 py-3">Nome</th><th scope="col" class="px-6 py-3 text-right">Ações</th></tr></thead><tbody id="analystsTableBody"></tbody></table></div>
+                        </div>
+                         <div class="card">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold text-gray-700">Serviços</h2>
+                                <button onclick="openManageModal('service')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">+</button>
+                            </div>
+                            <div class="table-container border rounded-lg"><table class="w-full text-sm text-left text-gray-500"><thead class="text-xs text-gray-700 uppercase bg-gray-50"><tr><th scope="col" class="px-6 py-3">Nome</th><th scope="col" class="px-6 py-3 text-right">Ações</th></tr></thead><tbody id="servicesTableBody"></tbody></table></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAIS -->
+    <div id="entryModal" class="modal-backdrop"><div class="modal-content"><h2 id="modalTitle" class="text-2xl font-bold mb-6">Adicionar Registro</h2><form id="entryForm"><input type="hidden" id="recordId">
+        <div class="mb-4">
+            <label for="embarcacao" class="block text-sm font-medium text-gray-700">Embarcação</label>
+            <select id="embarcacao" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"></select>
+        </div>
+        <div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-2">Serviços e Quantidades</label><div id="services-checkboxes" class="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 max-h-40 overflow-y-auto p-2 border rounded-md"></div></div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div><label for="dataRealizado" class="block text-sm font-medium text-gray-700">Data Realizado</label><input type="date" id="dataRealizado" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div><div><label for="dataValidade" class="block text-sm font-medium text-gray-700">Data de Validade</label><input type="date" id="dataValidade" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div><div><label for="status" class="block text-sm font-medium text-gray-700">Status</label><select id="status" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"><option value="Finalizado">Finalizado</option><option value="Pendente">Pendente</option></select></div></div>
+        <div class="flex justify-end gap-4"><button type="button" onclick="closeModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar</button></div>
+    </form></div></div>
+    <div id="manageModal" class="modal-backdrop"><div class="modal-content" style="max-width: 400px;"><h2 id="manageModalTitle" class="text-2xl font-bold mb-6"></h2><form id="manageForm"><input type="hidden" id="manageId"><div id="manage-fields" class="space-y-4"></div><div class="flex justify-end gap-4 mt-6"><button type="button" onclick="closeManageModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">Salvar</button></div></form></div></div>
+
+    <div id="config-error" class="hidden fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-8 rounded-lg shadow-2xl max-w-lg text-center">
+            <h2 class="text-3xl font-bold text-red-600">Configuração Incompleta!</h2>
+            <p class="mt-4 text-lg text-gray-700">Você precisa adicionar suas chaves de configuração do Firebase para que o painel se conecte ao banco de dados online.</p>
+            <p class="mt-4 text-sm text-gray-600">Por favor, siga o guia para criar um projeto no Firebase, obter suas chaves de acesso e colá-las dentro do arquivo HTML no local indicado. Sem isso, o programa não pode funcionar.</p>
+            <button onclick="document.getElementById('config-error').classList.add('hidden')" class="mt-6 bg-blue-600 text-white font-bold py-2 px-6 rounded-lg">Entendi</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        // --- IMPORTANTE: COLE A SUA CONFIGURAÇÃO DO FIREBASE AQUI ---
+        const firebaseConfig = {
+          apiKey: "AIzaSyDmPyjEXeQ8w5xp2fIFm8-X8qGXWtK6n74",
+          authDomain: "nr13-rcq.firebaseapp.com",
+          projectId: "nr13-rcq",
+          storageBucket: "nr13-rcq.appspot.com",
+          messagingSenderId: "621648333557",
+          appId: "1:621648333557:web:33eace50cb955deb8a93bc",
+          measurementId: "G-61W74SQR12"
+        };
+        // -----------------------------------------------------------
+
+        // --- VARIÁVEIS GLOBAIS ---
+        let allData = [], allServices = [], allVessels = [], allAnalysts = [], allCoordinators = [], allCompanies = [];
+        let charts = {};
+        let db;
+        let calibrationsCol, servicesCol, vesselsCol, analystsCol, coordinatorsCol, companiesCol;
+        let currentManageType = '';
+
+        // --- INICIALIZAÇÃO E NAVEGAÇÃO ---
+        async function initFirebase() { 
+            if (firebaseConfig.apiKey === "COLE-SUA-API-KEY-AQUI") {
+                document.getElementById('config-error').classList.remove('hidden');
+                document.getElementById('dataTableBody').innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-600 font-bold">Configuração do Firebase pendente.</td></tr>`;
+                return;
+            }
+        
+            try {
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                db = getFirestore(app);
+                calibrationsCol = collection(db, "calibrations");
+                servicesCol = collection(db, "services");
+                vesselsCol = collection(db, "vessels");
+                analystsCol = collection(db, "analysts");
+                coordinatorsCol = collection(db, "coordinators");
+                companiesCol = collection(db, "companies");
+                await signInAnonymously(auth);
+
+                onSnapshot(servicesCol, (snapshot) => {
+                    allServices = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => a.name.localeCompare(b.name));
+                    renderServicesTable(allServices);
+                    populateServicesCheckboxes();
+                });
+                
+                onSnapshot(companiesCol, (snapshot) => {
+                    allCompanies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => a.name.localeCompare(b.name));
+                    renderCompaniesTable(allCompanies);
+                    renderVesselsTable(allVessels); 
+                });
+
+                onSnapshot(vesselsCol, (snapshot) => {
+                    allVessels = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => a.name.localeCompare(b.name));
+                    renderVesselsTable(allVessels);
+                    populateVesselSelect();
+                    updateChartsAndKPIs(allData);
+                });
+                
+                onSnapshot(analystsCol, (snapshot) => {
+                    allAnalysts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => a.name.localeCompare(b.name));
+                    renderAnalystsTable(allAnalysts);
+                    renderVesselsTable(allVessels);
+                });
+                
+                onSnapshot(coordinatorsCol, (snapshot) => {
+                    allCoordinators = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).sort((a,b) => a.name.localeCompare(b.name));
+                    renderCoordinatorsTable(allCoordinators);
+                    renderVesselsTable(allVessels);
+                });
+
+                onSnapshot(calibrationsCol, (snapshot) => {
+                    allData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    refreshUI();
+                    populateOpportunityFilters();
+                });
+            } catch (error) {
+                console.error("ERRO DE CONEXÃO COM O FIREBASE:", error);
+                let errorMessage = 'Falha ao conectar com o banco de dados. Verifique suas chaves do Firebase e as regras de segurança do Firestore.';
+                if (error.code === 'auth/configuration-not-found') {
+                    errorMessage = '<b>ERRO:</b> A autenticação anônima não está ativada. <br>Vá em <b>Build > Authentication > Sign-in method</b> no Firebase e ative a opção "Anônimo".';
+                }
+                document.getElementById('dataTableBody').innerHTML = `<tr><td colspan="8" class="text-center py-4 text-red-600 font-bold">${errorMessage}</td></tr>`;
+            }
+        }
+        window.changeTab = (tabName) => { 
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.getElementById(tabName).classList.remove('hidden');
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`button[onclick="changeTab('${tabName}')"]`).classList.add('active');
+            if (tabName === 'opportunities') {
+                generateOpportunityReport();
+            }
+        }
+        document.addEventListener('DOMContentLoaded', initFirebase);
+        
+        // --- LÓGICA DE DADOS ---
+        function getLatestCertifications(data) {
+            const latestCerts = new Map();
+            const sortedData = [...data].sort((a, b) => new Date(a.dataRealizado) - new Date(b.dataRealizado));
+            sortedData.forEach(record => {
+                if (!record || !record.dataValidade) return;
+                (record.services || []).forEach(service => {
+                    const key = `${record.embarcacao}|${service.name}`;
+                    latestCerts.set(key, record);
+                });
+            });
+            return Array.from(latestCerts.values());
+        }
+
+        function processData(data) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            return data.map(item => {
+                if (!item || !item.dataValidade) return null;
+                const dataValidade = new Date(item.dataValidade + 'T00:00:00');
+                if (isNaN(dataValidade)) return null;
+
+                const diffTime = dataValidade - today;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const situacao = diffDays < 0 ? 'Vencido' : 'A vencer';
+                return { ...item, diasAVencer: diffDays, situacao: situacao,
+                    dataRealizadoFmt: new Date(item.dataRealizado + 'T00:00:00').toLocaleDateString('pt-BR'),
+                    dataValidadeFmt: dataValidade.toLocaleDateString('pt-BR')
+                };
+            }).filter(Boolean).sort((a, b) => a.diasAVencer - b.diasAVencer);
+        }
+
+        function refreshUI() {
+            const processedData = processData(allData);
+            const filteredData = applyFilters(processedData);
+            renderTable(filteredData);
+            updateChartsAndKPIs(allData); 
+        }
+        
+        function applyFilters(data) {
+            const filterEmbarcacao = document.getElementById('filterEmbarcacao').value.toLowerCase();
+            const filterSituacao = document.getElementById('filterSituacao').value;
+            const filterStatus = document.getElementById('filterStatus').value;
+            return data.filter(item => 
+                (item.embarcacao.toLowerCase().includes(filterEmbarcacao)) &&
+                (filterSituacao === '' || item.situacao === filterSituacao) &&
+                (filterStatus === '' || item.status === filterStatus)
+            );
+        }
+
+        // --- RENDERIZAÇÃO ---
+        function renderTable(data) {
+            const tableBody = document.getElementById('dataTableBody');
+            tableBody.innerHTML = '';
+            if (data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="8" class="text-center py-4">Nenhum registro encontrado.</td></tr>';
+                return;
+            }
+            data.forEach(item => {
+                const rowClass = item.situacao === 'Vencido' ? 'bg-red-100 text-red-900' : '';
+                const servicesText = (item.services || []).map(s => `${s.name} (${s.qty})`).join(', ');
+                const statusBadge = item.status === 'Pendente' 
+                    ? `<span class="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-yellow-200 text-yellow-800">Pendente</span>`
+                    : `<span class="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-green-200 text-green-800">Finalizado</span>`;
+                const situacaoBadge = item.situacao === 'Vencido'
+                    ? `<span class="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-red-200 text-red-800">Vencido</span>`
+                    : `<span class="px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap bg-blue-200 text-blue-800">A vencer</span>`;
+
+                const row = `<tr class="bg-white border-b hover:bg-gray-50 ${rowClass}">
+                    <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">${item.embarcacao}</td>
+                    <td class="px-6 py-4">${item.analista}</td>
+                    <td class="px-6 py-4">${servicesText}</td>
+                    <td class="px-6 py-4">${item.dataRealizadoFmt}</td>
+                    <td class="px-6 py-4">${item.dataValidadeFmt}</td>
+                    <td class="px-6 py-4">${situacaoBadge}</td>
+                    <td class="px-6 py-4">${statusBadge}</td>
+                    <td class="px-6 py-4 flex gap-2 no-print"><button onclick="openModalToEdit('${item.id}')" class="text-blue-600 hover:text-blue-800">Editar</button><button onclick="deleteRecord('${item.id}')" class="text-red-600 hover:text-red-800">Excluir</button></td>
+                </tr>`;
+                tableBody.innerHTML += row;
+            });
+        }
+        
+        function updateChartsAndKPIs(data) {
+            const latestCertsData = getLatestCertifications(data);
+            
+            // KPI's
+            document.getElementById('kpi-vencidos').innerText = latestCertsData.filter(c => c.situacao === 'Vencido').length;
+            document.getElementById('kpi-a-vencer').innerText = latestCertsData.filter(c => c.situacao === 'A vencer' && c.diasAVencer <= 90).length;
+            document.getElementById('kpi-embarcacoes').innerText = allVessels.length;
+            document.getElementById('kpi-empresas').innerText = allCompanies.length;
+            
+            // Gráfico de Situação
+            const statusCtx = document.getElementById('statusChart');
+            if(statusCtx) {
+                const statusCounts = latestCertsData.reduce((acc, item) => { 
+                    if(item && item.situacao) {
+                        acc[item.situacao] = (acc[item.situacao] || 0) + 1;
+                    }
+                    return acc; 
+                }, { 'A vencer': 0, 'Vencido': 0 });
+                if (charts.status) charts.status.destroy();
+                charts.status = new Chart(statusCtx, { type: 'pie', data: { labels: Object.keys(statusCounts), datasets: [{ data: Object.values(statusCounts), backgroundColor: ['#3b82f6', '#ef4444'], borderColor: '#ffffff' }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } } });
+            }
+
+
+            // Gráfico Embarcações por Empresa
+            const companyVesselsCtx = document.getElementById('companyVesselsChart').getContext('2d');
+            const companyCounts = allVessels.reduce((acc, vessel) => {
+                const company = allCompanies.find(c => c.id === vessel.companyId);
+                const companyName = company ? company.name : "Sem Empresa";
+                acc[companyName] = (acc[companyName] || 0) + 1;
+                return acc;
+            }, {});
+            
+            const sortedCompanies = Object.entries(companyCounts).sort(([,a],[,b]) => b-a);
+            
+            const shipIcon = new Image(20, 20);
+            shipIcon.src = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2s2.5 2 5 2c1.3 0 1.9-.5 2.5-1M19.5 13.5 12 6 4.5 13.5"/></svg>');
+            
+            const topLabels = {
+                id: 'topLabels',
+                afterDatasetsDraw(chart, args, pluginOptions) {
+                    const { ctx, scales: {x, y} } = chart;
+                    ctx.save();
+                    chart.data.datasets[0].data.forEach((value, index) => {
+                        const yPos = y.getPixelForValue(index);
+                        ctx.drawImage(shipIcon, x.getPixelForValue(value) - 10, yPos - 10, 20, 20);
+                    });
+                }
+            };
+            
+            if (charts.companyVessels) charts.companyVessels.destroy();
+            charts.companyVessels = new Chart(companyVesselsCtx, {
+                type: 'bar',
+                data: {
+                    labels: sortedCompanies.map(c => c[0]),
+                    datasets: [{
+                        label: 'Nº de Embarcações',
+                        data: sortedCompanies.map(c => c[1]),
+                        backgroundColor: '#2563eb'
+                    }]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } } },
+                plugins: [topLabels]
+            });
+        }
+        
+        function renderServicesTable(services) {
+            const tableBody = document.getElementById('servicesTableBody');
+            tableBody.innerHTML = '';
+            if (services.length === 0) { tableBody.innerHTML = '<tr><td colspan="2" class="text-center py-4">Nenhum serviço.</td></tr>'; return; }
+            services.forEach(item => {
+                tableBody.innerHTML += `<tr class="bg-white border-b"><td class="px-6 py-4 font-medium text-gray-900">${item.name}</td><td class="px-6 py-4 flex gap-4 justify-end"><button onclick="openManageModal('service', '${item.id}')" class="text-blue-600">Editar</button><button onclick="deleteManageItem('service', '${item.id}')" class="text-red-600">Excluir</button></td></tr>`;
+            });
+        }
+        function renderCompaniesTable(companies) {
+            const tableBody = document.getElementById('companiesTableBody');
+            tableBody.innerHTML = '';
+            if (companies.length === 0) { tableBody.innerHTML = '<tr><td colspan="2" class="text-center py-4">Nenhuma empresa.</td></tr>'; return; }
+            companies.forEach(item => {
+                tableBody.innerHTML += `<tr class="bg-white border-b"><td class="px-6 py-4 font-medium text-gray-900">${item.name}</td><td class="px-6 py-4 flex gap-4 justify-end"><button onclick="openManageModal('company', '${item.id}')" class="text-blue-600">Editar</button><button onclick="deleteManageItem('company', '${item.id}')" class="text-red-600">Excluir</button></td></tr>`;
+            });
+        }
+        function renderVesselsTable(vessels) {
+            const tableBody = document.getElementById('vesselsTableBody');
+            tableBody.innerHTML = '';
+            if (vessels.length === 0) { tableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4">Nenhuma embarcação.</td></tr>'; return; }
+            vessels.forEach(item => {
+                const coordinator = allCoordinators.find(c => c.id === item.coordinatorId);
+                const company = allCompanies.find(c => c.id === item.companyId);
+                const analyst = allAnalysts.find(a => a.id === item.analystId);
+                tableBody.innerHTML += `<tr class="bg-white border-b"><td class="px-6 py-4 font-medium text-gray-900">${item.name}</td><td class="px-6 py-4 text-gray-600">${company ? company.name : 'N/A'}</td><td class="px-6 py-4 text-gray-600">${coordinator ? coordinator.name : 'N/A'}</td><td class="px-6 py-4 text-gray-600">${analyst ? analyst.name : 'N/A'}</td><td class="px-6 py-4 flex gap-4 justify-end"><button onclick="openManageModal('vessel', '${item.id}')" class="text-blue-600">Editar</button><button onclick="deleteManageItem('vessel', '${item.id}')" class="text-red-600">Excluir</button></td></tr>`;
+            });
+        }
+        function renderAnalystsTable(analysts) {
+            const tableBody = document.getElementById('analystsTableBody');
+            tableBody.innerHTML = '';
+            if (analysts.length === 0) { tableBody.innerHTML = '<tr><td colspan="2" class="text-center py-4">Nenhum analista.</td></tr>'; return; }
+            analysts.forEach(item => {
+                tableBody.innerHTML += `<tr class="bg-white border-b"><td class="px-6 py-4 font-medium text-gray-900">${item.name}</td><td class="px-6 py-4 flex gap-4 justify-end"><button onclick="openManageModal('analyst', '${item.id}')" class="text-blue-600">Editar</button><button onclick="deleteManageItem('analyst', '${item.id}')" class="text-red-600">Excluir</button></td></tr>`;
+            });
+        }
+        function renderCoordinatorsTable(coordinators) {
+            const tableBody = document.getElementById('coordinatorsTableBody');
+            tableBody.innerHTML = '';
+            if (coordinators.length === 0) { tableBody.innerHTML = '<tr><td colspan="3" class="text-center py-4">Nenhum coordenador.</td></tr>'; return; }
+            coordinators.forEach(item => {
+                const contact = `${item.email || ''}<br>${item.phone || ''}`;
+                tableBody.innerHTML += `<tr class="bg-white border-b"><td class="px-6 py-4 font-medium text-gray-900">${item.name}</td><td class="px-6 py-4 text-sm text-gray-600">${contact}</td><td class="px-6 py-4 flex gap-4 justify-end"><button onclick="openManageModal('coordinator', '${item.id}')" class="text-blue-600">Editar</button><button onclick="deleteManageItem('coordinator', '${item.id}')" class="text-red-600">Excluir</button></td></tr>`;
+            });
+        }
+        
+        function populateServicesCheckboxes(servicesInRecord = []) {
+            const container = document.getElementById('services-checkboxes');
+            container.innerHTML = '';
+            if(allServices.length === 0) { container.innerHTML = '<p class="text-sm text-gray-500 col-span-full">Nenhum serviço cadastrado.</p>'; return; }
+            allServices.forEach(service => {
+                const existingService = servicesInRecord.find(s => s.name === service.name);
+                const isChecked = existingService ? 'checked' : '';
+                const qty = existingService ? existingService.qty : 1;
+                const qtyInputId = `qty-${service.id}`;
+                container.innerHTML += `
+                    <div class="flex items-center justify-between">
+                        <label class="flex items-center space-x-2 text-sm">
+                            <input type="checkbox" name="services" value="${service.name}" data-qty-id="${qtyInputId}" ${isChecked} class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring focus:ring-blue-200">
+                            <span>${service.name}</span>
+                        </label>
+                        <input type="number" id="${qtyInputId}" value="${qty}" min="1" class="w-16 text-sm border-gray-300 rounded-md shadow-sm ${isChecked ? '' : 'hidden'}">
+                    </div>
+                `;
+            });
+            container.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    document.getElementById(e.target.dataset.qtyId).classList.toggle('hidden', !e.target.checked);
+                });
+            });
+        }
+        function populateVesselSelect(selectedValue = '') {
+            const select = document.getElementById('embarcacao');
+            select.innerHTML = '<option value="">Selecione...</option>' + allVessels.map(v => `<option value="${v.name}" ${v.name === selectedValue ? 'selected' : ''}>${v.name}</option>`).join('');
+        }
+        function populateAnalystSelect(selectedValue = '') {
+            return '<option value="">Nenhum</option>' + allAnalysts.map(c => `<option value="${c.id}" ${c.id === selectedValue ? 'selected' : ''}>${c.name}</option>`).join('');
+        }
+        function populateCoordinatorSelect(selectedValue = '') {
+            return '<option value="">Nenhum</option>' + allCoordinators.map(c => `<option value="${c.id}" ${c.id === selectedValue ? 'selected' : ''}>${c.name}</option>`).join('');
+        }
+        function populateCompanySelect(selectedValue = '') {
+            return '<option value="">Nenhuma</option>' + allCompanies.map(c => `<option value="${c.id}" ${c.id === selectedValue ? 'selected' : ''}>${c.name}</option>`).join('');
+        }
+
+        // --- MODAIS ---
+        const entryModal = document.getElementById('entryModal');
+        const manageModal = document.getElementById('manageModal');
+        const entryForm = document.getElementById('entryForm');
+        const manageForm = document.getElementById('manageForm');
+        
+        window.openModal = () => { entryForm.reset(); document.getElementById('recordId').value = ''; populateServicesCheckboxes(); populateVesselSelect(); document.getElementById('modalTitle').innerText = 'Adicionar Registro'; entryModal.classList.add('is-visible'); }
+        window.closeModal = () => { entryModal.classList.remove('is-visible'); }
+        
+        window.openManageModal = (type, id = null) => {
+            currentManageType = type;
+            manageForm.reset();
+            const fieldsContainer = document.getElementById('manage-fields');
+            fieldsContainer.innerHTML = '';
+            document.getElementById('manageId').value = id || '';
+            const title = document.getElementById('manageModalTitle');
+            
+            let data;
+            if (type === 'service') {
+                data = allServices.find(i => i.id === id);
+                title.innerText = id ? 'Editar Serviço' : 'Adicionar Serviço';
+                fieldsContainer.innerHTML = `<div><label for="manageName" class="block text-sm font-medium text-gray-700">Nome</label><input type="text" id="manageName" required value="${data ? data.name : ''}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div>`;
+            } else if (type === 'vessel') {
+                data = allVessels.find(i => i.id === id);
+                title.innerText = id ? 'Editar Embarcação' : 'Adicionar Embarcação';
+                fieldsContainer.innerHTML = `<div><label for="manageName" class="block text-sm font-medium text-gray-700">Nome</label><input type="text" id="manageName" required value="${data ? data.name : ''}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div>
+                <div><label for="manageCompany" class="block text-sm font-medium text-gray-700">Empresa</label><select id="manageCompany" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">${populateCompanySelect(data ? data.companyId : '')}</select></div>
+                <div><label for="manageCoordinator" class="block text-sm font-medium text-gray-700">Coordenador</label><select id="manageCoordinator" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">${populateCoordinatorSelect(data ? data.coordinatorId : '')}</select></div>
+                <div><label for="manageAnalyst" class="block text-sm font-medium text-gray-700">Analista</label><select id="manageAnalyst" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm">${populateAnalystSelect(data ? data.analystId : '')}</select></div>`;
+            } else if (type === 'analyst') {
+                data = allAnalysts.find(i => i.id === id);
+                title.innerText = id ? 'Editar Analista' : 'Adicionar Analista';
+                fieldsContainer.innerHTML = `<div><label for="manageName" class="block text-sm font-medium text-gray-700">Nome</label><input type="text" id="manageName" required value="${data ? data.name : ''}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div>`;
+            } else if (type === 'coordinator') {
+                data = allCoordinators.find(i => i.id === id);
+                title.innerText = id ? 'Editar Coordenador' : 'Adicionar Coordenador';
+                fieldsContainer.innerHTML = `<div><label for="manageName" class="block text-sm font-medium text-gray-700">Nome</label><input type="text" id="manageName" required value="${data ? data.name : ''}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div>
+                <div><label for="manageEmail" class="block text-sm font-medium text-gray-700">E-mail</label><input type="email" id="manageEmail" value="${data ? data.email : ''}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div>
+                <div><label for="managePhone" class="block text-sm font-medium text-gray-700">Telefone</label><input type="tel" id="managePhone" value="${data ? data.phone : ''}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div>`;
+            } else if (type === 'company') {
+                data = allCompanies.find(i => i.id === id);
+                title.innerText = id ? 'Editar Empresa' : 'Adicionar Empresa';
+                fieldsContainer.innerHTML = `<div><label for="manageName" class="block text-sm font-medium text-gray-700">Nome da Empresa</label><input type="text" id="manageName" required value="${data ? data.name : ''}" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm"></div>`;
+            }
+            manageModal.classList.add('is-visible');
+        }
+        window.closeManageModal = () => manageModal.classList.remove('is-visible');
+
+        // --- AÇÕES CRUD (REGISTROS) ---
+        entryForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('recordId').value;
+            const selectedServices = [];
+            document.querySelectorAll('#services-checkboxes input[type="checkbox"]:checked').forEach(cb => {
+                const qtyInput = document.getElementById(cb.dataset.qtyId);
+                selectedServices.push({ name: cb.value, qty: parseInt(qtyInput.value) || 1 });
+            });
+
+            if(selectedServices.length === 0) { alert('Selecione ao menos um serviço.'); return; }
+            if(!document.getElementById('embarcacao').value) { alert('Selecione uma embarcação.'); return; }
+            
+            const vesselName = document.getElementById('embarcacao').value;
+            const vessel = allVessels.find(v => v.name === vesselName);
+            const analyst = allAnalysts.find(a => a.id === (vessel ? vessel.analystId : ''));
+            
+            if (!analyst) {
+                alert('A embarcação selecionada não possui um analista vinculado. Por favor, edite a embarcação na aba de Gerenciamento.');
+                return;
+            }
+            
+            const recordData = {
+                embarcacao: vesselName,
+                analista: analyst.name,
+                dataRealizado: document.getElementById('dataRealizado').value,
+                dataValidade: document.getElementById('dataValidade').value,
+                status: document.getElementById('status').value,
+                services: selectedServices
+            };
+            try {
+                if (id) { await updateDoc(doc(db, "calibrations", id), recordData); } 
+                else { await addDoc(calibrationsCol, recordData); }
+                closeModal();
+            } catch (error) { console.error("Erro:", error); alert("Erro ao salvar registro."); }
+        });
+
+        window.openModalToEdit = (id) => {
+            const record = allData.find(item => item.id === id);
+            if (!record) return;
+            document.getElementById('recordId').value = record.id;
+            populateVesselSelect(record.embarcacao);
+            document.getElementById('dataRealizado').value = record.dataRealizado;
+            document.getElementById('dataValidade').value = record.dataValidade;
+            document.getElementById('status').value = record.status || 'Finalizado';
+            populateServicesCheckboxes(record.services || []);
+            document.getElementById('modalTitle').innerText = 'Editar Registro';
+            entryModal.classList.add('is-visible');
+        }
+
+        window.deleteRecord = async (id) => { if (confirm('Tem certeza?')) { try { await deleteDoc(doc(db, "calibrations", id)); } catch(error) { console.error("Erro:", error); alert("Erro ao excluir."); } } }
+
+        // --- AÇÕES CRUD (GERENCIAMENTO) ---
+        manageForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('manageId').value;
+            const name = document.getElementById('manageName').value.trim();
+            if(!name) return;
+            
+            let col, data;
+            if (currentManageType === 'service') { col = servicesCol; data = { name }; }
+            else if (currentManageType === 'vessel') { 
+                col = vesselsCol; 
+                data = { name, companyId: document.getElementById('manageCompany').value, coordinatorId: document.getElementById('manageCoordinator').value, analystId: document.getElementById('manageAnalyst').value };
+            }
+            else if (currentManageType === 'analyst') { col = analystsCol; data = { name }; }
+            else if (currentManageType === 'coordinator') {
+                col = coordinatorsCol;
+                data = { name, email: document.getElementById('manageEmail').value, phone: document.getElementById('managePhone').value };
+            }
+             else if (currentManageType === 'company') { col = companiesCol; data = { name }; }
+            else return;
+
+            try {
+                if (id) { await updateDoc(doc(db, col.path, id), data); } 
+                else { await addDoc(col, data); }
+                closeManageModal();
+            } catch (error) { console.error("Erro:", error); alert("Erro ao salvar item."); }
+        });
+        
+        window.deleteManageItem = async (type, id) => { 
+            let col;
+            if (type === 'service') col = servicesCol;
+            else if (type === 'vessel') col = vesselsCol;
+            else if (type === 'analyst') col = analystsCol;
+            else if (type === 'coordinator') col = coordinatorsCol;
+            else if (type === 'company') col = companiesCol;
+            else return;
+            if (confirm('Tem certeza?')) { try { await deleteDoc(doc(db, col.path, id)); } catch(error) { console.error("Erro:", error); alert("Erro ao excluir item."); } } 
+        }
+
+        // --- ANÁLISE DE OPORTUNIDADES ---
+        window.generateOpportunityReport = () => {
+            const year1Select = document.getElementById('opp-year1');
+            const year2Select = document.getElementById('opp-year2');
+            const vesselFilterSelect = document.getElementById('opp-vessel-filter');
+            const reportDiv = document.getElementById('opportunity-report');
+
+            if(!year1Select || !year2Select || !vesselFilterSelect || !reportDiv) return;
+
+            const year1 = year1Select.value;
+            const year2 = year2Select.value;
+            const vesselFilter = vesselFilterSelect.value;
+
+            if(!year1 || !year2) {
+                reportDiv.innerHTML = `<p class="text-center text-red-500">Por favor, selecione os anos.</p>`;
+                return;
+            }
+
+            let reportHTML = '';
+            const vesselsToReport = vesselFilter ? allVessels.filter(v => v.name === vesselFilter) : allVessels;
+
+            vesselsToReport.forEach(vessel => {
+                const coordinator = allCoordinators.find(c => c.id === vessel.coordinatorId);
+                const company = allCompanies.find(c => c.id === vessel.companyId);
+                const recordsForVessel = allData.filter(r => r.embarcacao === vessel.name);
+                
+                const servicesY1 = new Map();
+                recordsForVessel.filter(r => new Date(r.dataRealizado).getFullYear() == year1)
+                    .flatMap(r => r.services || [])
+                    .forEach(s => servicesY1.set(s.name, (servicesY1.get(s.name) || 0) + s.qty));
+                
+                const servicesY2 = new Map();
+                recordsForVessel.filter(r => new Date(r.dataRealizado).getFullYear() == year2)
+                    .flatMap(r => r.services || [])
+                    .forEach(s => servicesY2.set(s.name, (servicesY2.get(s.name) || 0) + s.qty));
+                
+                let opportunitiesHTML = '';
+                servicesY1.forEach((qty1, serviceName) => {
+                    const qty2 = servicesY2.get(serviceName) || 0;
+                    let statusHTML = '';
+                    if (qty2 >= qty1) {
+                        statusHTML = `<span class="text-xs font-semibold text-gray-500">REALIZADO (${qty2} em ${year2} / ${qty1} em ${year1})</span>`;
+                    } else {
+                        const diff = qty1 - qty2;
+                        statusHTML = `<span class="text-xs font-bold text-green-600">OFERTAR ${diff} (Feito ${qty1} em ${year1} / ${qty2} em ${year2})</span>`;
+                    }
+                    opportunitiesHTML += `<li class="flex justify-between items-center py-2 border-b"><span class="text-gray-700">${serviceName}</span> ${statusHTML}</li>`;
+                });
+                
+                if (opportunitiesHTML !== '') {
+                    reportHTML += `<div class="p-4 border rounded-lg bg-white">
+                        <h3 class="font-bold text-lg text-gray-800">${vessel.name} <span class="text-sm font-normal text-gray-500">- ${company ? company.name : 'Sem empresa'}</span></h3>
+                        ${coordinator ? `<div class="text-xs text-gray-500 mt-1">Coord.: ${coordinator.name} | ${coordinator.email} | ${coordinator.phone}</div>` : ''}
+                        <ul class="mt-2">${opportunitiesHTML}</ul>
+                    </div>`;
+                }
+            });
+
+            if (reportHTML === '') {
+                reportHTML = `<p class="text-center text-gray-600 mt-4">Nenhuma oportunidade encontrada para os filtros selecionados.</p>`;
+            }
+            
+            reportDiv.innerHTML = reportHTML;
+        }
+
+        function populateOpportunityFilters() {
+            const years = [...new Set(allData.map(r => new Date(r.dataRealizado).getFullYear()))].sort((a,b) => b-a);
+            const currentYear = new Date().getFullYear();
+            if(!years.includes(currentYear)) years.unshift(currentYear);
+
+            const year1Select = document.getElementById('opp-year1');
+            const year2Select = document.getElementById('opp-year2');
+            
+            if (!year1Select || !year2Select) return;
+
+            year1Select.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+            year2Select.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+            
+            if(years.length > 1) {
+                year1Select.value = years[1];
+                year2Select.value = years[0];
+            } else if (years.length === 1) {
+                 year1Select.value = years[0];
+                 year2Select.value = years[0];
+            }
+            const attendanceVesselSelect = document.getElementById('attendance-vessel-filter');
+            if(attendanceVesselSelect) {
+                attendanceVesselSelect.innerHTML = '<option value="">Todas</option>' + allVessels.map(v => `<option value="${v.name}">${v.name}</option>`).join('');
+            }
+
+            const oppVesselSelect = document.getElementById('opp-vessel-filter');
+            if(oppVesselSelect) {
+                oppVesselSelect.innerHTML = '<option value="">Todas as Embarcações</option>' + allVessels.map(v => `<option value="${v.name}">${v.name}</option>`).join('');
+            }
+        }
+        
+        window.generatePDF = () => {
+            const { jsPDF } = window.jspdf;
+            const reportElement = document.getElementById('pdf-content');
+            document.getElementById('pdf-header').style.display = 'block';
+            document.getElementById('pdf-date').innerText = `Gerado em: ${new Date().toLocaleDateString('pt-BR')}`;
+            
+            html2canvas(reportElement, { scale: 2 }).then(canvas => {
+                document.getElementById('pdf-header').style.display = 'none';
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = pdf.internal.pageSize.getHeight();
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const ratio = canvasWidth / canvasHeight;
+                const imgWidth = pdfWidth - 20;
+                const imgHeight = imgWidth / ratio;
+                let heightLeft = imgHeight;
+                let position = 10;
+                
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= (pdfHeight - 20);
+
+                while (heightLeft > 0) {
+                    position = heightLeft - imgHeight + 10;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                    heightLeft -= (pdfHeight - 20);
+                }
+                const filename = `Relatorio_Oportunidades_${new Date().toISOString().slice(0,10)}.pdf`;
+                pdf.save(filename);
+            });
+        }
+
+    </script>
+</body>
+</html>
+
